@@ -10,6 +10,7 @@ import 'attendance_store.dart';
 import 'models.dart';
 
 const String appBrandImageAsset = 'assets/images/app_logo.jpeg';
+const String clubManagerName = 'وليد مليجي';
 
 void main() {
   runApp(const MainApp());
@@ -190,6 +191,16 @@ class _HomeScreenState extends State<HomeScreen> {
   String _query = '';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _showWelcomeMessage();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -230,6 +241,16 @@ class _HomeScreenState extends State<HomeScreen> {
             children: <Widget>[
               DashboardGrid(
                 store: widget.store,
+                onOpenAllMembers: () =>
+                    _openDashboardMembers(context, DashboardMemberFilter.all),
+                onOpenActiveMembers: () => _openDashboardMembers(
+                  context,
+                  DashboardMemberFilter.active,
+                ),
+                onOpenExpiredMembers: () => _openDashboardMembers(
+                  context,
+                  DashboardMemberFilter.expired,
+                ),
                 onOpenTodayAttendance: () => _openTodayAttendance(context),
               ),
               const SizedBox(height: 16),
@@ -257,10 +278,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
+              const SizedBox(height: 18),
+              const ClubManagerFooter(),
             ],
           ),
         );
       },
+    );
+  }
+
+  Future<void> _showWelcomeMessage() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => const WelcomeDialog(),
     );
   }
 
@@ -289,6 +319,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openDashboardMembers(
+    BuildContext context,
+    DashboardMemberFilter filter,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            DashboardMembersScreen(store: widget.store, filter: filter),
+      ),
+    );
+  }
+
   void _openTodayAttendance(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -298,14 +340,430 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+class WelcomeDialog extends StatelessWidget {
+  const WelcomeDialog({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              appBrandImageAsset,
+              width: 160,
+              height: 160,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Welcome',
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'مدير النادي',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Colors.black.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            clubManagerName,
+            textAlign: TextAlign.center,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+      actionsAlignment: MainAxisAlignment.center,
+      actions: <Widget>[
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('دخول'),
+        ),
+      ],
+    );
+  }
+}
+
+class ClubManagerFooter extends StatelessWidget {
+  const ClubManagerFooter({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'مدير النادي: $clubManagerName',
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+        color: Colors.black.withValues(alpha: 0.58),
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+}
+
+enum DashboardMemberFilter { all, active, expired }
+
+extension DashboardMemberFilterText on DashboardMemberFilter {
+  String get title {
+    return switch (this) {
+      DashboardMemberFilter.all => 'الأعضاء بالتفاصيل',
+      DashboardMemberFilter.active => 'لديه اشتراك',
+      DashboardMemberFilter.expired => 'خلصت حصصه',
+    };
+  }
+
+  String get summary {
+    return switch (this) {
+      DashboardMemberFilter.all => 'كل أعضاء النادي المسجلين',
+      DashboardMemberFilter.active => 'الأعضاء الذين لديهم اشتراك أو حصص متاحة',
+      DashboardMemberFilter.expired =>
+        'الأعضاء الذين انتهى اشتراكهم أو خلصت حصصهم',
+    };
+  }
+
+  String get emptyText {
+    return switch (this) {
+      DashboardMemberFilter.all => 'لا يوجد أعضاء بعد',
+      DashboardMemberFilter.active => 'لا يوجد أعضاء لديهم اشتراك متاح',
+      DashboardMemberFilter.expired => 'لا يوجد أعضاء خلصت حصصهم',
+    };
+  }
+
+  IconData get icon {
+    return switch (this) {
+      DashboardMemberFilter.all => Icons.groups_2_outlined,
+      DashboardMemberFilter.active => Icons.verified_user_outlined,
+      DashboardMemberFilter.expired => Icons.warning_amber_rounded,
+    };
+  }
+
+  Color get color {
+    return switch (this) {
+      DashboardMemberFilter.all => const Color(0xFF2563EB),
+      DashboardMemberFilter.active => const Color(0xFF0F766E),
+      DashboardMemberFilter.expired => const Color(0xFFDC2626),
+    };
+  }
+}
+
+class DashboardMembersScreen extends StatelessWidget {
+  const DashboardMembersScreen({
+    required this.store,
+    required this.filter,
+    super.key,
+  });
+
+  final AttendanceStore store;
+  final DashboardMemberFilter filter;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: store,
+      builder: (context, _) {
+        final members = _membersForFilter(store);
+
+        return Scaffold(
+          appBar: AppBar(title: Text(filter.title)),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+            children: <Widget>[
+              DashboardMembersSummaryCard(
+                filter: filter,
+                count: members.length,
+              ),
+              const SizedBox(height: 12),
+              if (members.isEmpty)
+                EmptyDashboardMembersState(message: filter.emptyText)
+              else
+                ...members.map((member) {
+                  final attendanceCount = store.attendanceCountFor(member.id);
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: DashboardMemberDetailsCard(
+                      member: member,
+                      attendanceCount: attendanceCount,
+                      onTap: () => _openProfile(context, member.id),
+                    ),
+                  );
+                }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  List<Member> _membersForFilter(AttendanceStore store) {
+    final members = store.members;
+
+    return switch (filter) {
+      DashboardMemberFilter.all => members,
+      DashboardMemberFilter.active => members.where((member) {
+        final attendanceCount = store.attendanceCountFor(member.id);
+        return member.subscriptionState(attendanceCount) !=
+            SubscriptionState.expired;
+      }).toList(),
+      DashboardMemberFilter.expired => members.where((member) {
+        final attendanceCount = store.attendanceCountFor(member.id);
+        return member.subscriptionState(attendanceCount) ==
+            SubscriptionState.expired;
+      }).toList(),
+    };
+  }
+
+  void _openProfile(BuildContext context, String memberId) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MemberProfileScreen(store: store, memberId: memberId),
+      ),
+    );
+  }
+}
+
+class DashboardMembersSummaryCard extends StatelessWidget {
+  const DashboardMembersSummaryCard({
+    required this.filter,
+    required this.count,
+    super.key,
+  });
+
+  final DashboardMemberFilter filter;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: filter.color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(filter.icon, color: filter.color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    filter.title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    filter.summary,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.black.withValues(alpha: 0.62),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              count.toString(),
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: filter.color,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class EmptyDashboardMembersState extends StatelessWidget {
+  const EmptyDashboardMembersState({required this.message, super.key});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: <Widget>[
+            const Icon(Icons.info_outline),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class DashboardMemberDetailsCard extends StatelessWidget {
+  const DashboardMemberDetailsCard({
+    required this.member,
+    required this.attendanceCount,
+    required this.onTap,
+    super.key,
+  });
+
+  final Member member;
+  final int attendanceCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = member.subscriptionState(attendanceCount);
+    final expiryDate = member.expiryDate;
+    final remainingText = member.isSessionCountBased
+        ? 'متبقي ${member.remainingSessions(attendanceCount)} من ${member.totalSessions} حصة'
+        : subscriptionDaysText(member.daysUntilExpiry());
+    final attendanceText = member.isSessionCountBased
+        ? '$attendanceCount/${member.totalSessions} حضور'
+        : '$attendanceCount حضور';
+    final endLabel = member.isSessionCountBased
+        ? 'إجمالي الحصص'
+        : 'تاريخ الانتهاء';
+    final endValue = member.isSessionCountBased
+        ? member.totalSessions.toString()
+        : expiryDate == null
+        ? 'بدون تاريخ انتهاء'
+        : formatDate(expiryDate);
+
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.1),
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    child: Text(_memberInitial(member.name)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          member.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          member.phone,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Colors.black.withValues(alpha: 0.62),
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.chevron_left,
+                    size: 20,
+                    color: Colors.black.withValues(alpha: 0.42),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: <Widget>[
+                  SubscriptionBadge(state: state),
+                  SmallInfoPill(
+                    text: member.subscriptionType,
+                    icon: Icons.card_membership,
+                  ),
+                  SmallInfoPill(
+                    text: attendanceText,
+                    icon: Icons.fact_check_outlined,
+                  ),
+                  SmallInfoPill(
+                    text: remainingText,
+                    icon: member.isSessionCountBased
+                        ? Icons.event_available_outlined
+                        : Icons.event_busy_outlined,
+                  ),
+                ],
+              ),
+              const Divider(height: 22),
+              DetailRow(
+                icon: Icons.payments_outlined,
+                label: 'المبلغ',
+                value: formatAmount(member.amount),
+              ),
+              const Divider(height: 18),
+              DetailRow(
+                icon: Icons.receipt_long_outlined,
+                label: 'تاريخ السداد',
+                value: formatDate(member.paymentDate),
+              ),
+              const Divider(height: 18),
+              DetailRow(
+                icon: member.isSessionCountBased
+                    ? Icons.confirmation_number_outlined
+                    : Icons.event_busy_outlined,
+                label: endLabel,
+                value: endValue,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class DashboardGrid extends StatelessWidget {
   const DashboardGrid({
     required this.store,
+    required this.onOpenAllMembers,
+    required this.onOpenActiveMembers,
+    required this.onOpenExpiredMembers,
     required this.onOpenTodayAttendance,
     super.key,
   });
 
   final AttendanceStore store;
+  final VoidCallback onOpenAllMembers;
+  final VoidCallback onOpenActiveMembers;
+  final VoidCallback onOpenExpiredMembers;
   final VoidCallback onOpenTodayAttendance;
 
   @override
@@ -327,18 +785,21 @@ class DashboardGrid extends StatelessWidget {
               value: store.totalMembers.toString(),
               icon: Icons.groups_2_outlined,
               color: const Color(0xFF2563EB),
+              onTap: onOpenAllMembers,
             ),
             StatTile(
               label: 'لديه حصص',
               value: store.activeMembers.toString(),
               icon: Icons.verified_user_outlined,
               color: const Color(0xFF0F766E),
+              onTap: onOpenActiveMembers,
             ),
             StatTile(
               label: 'خلصت حصصه',
               value: store.expiredMembers.toString(),
               icon: Icons.warning_amber_rounded,
               color: const Color(0xFFDC2626),
+              onTap: onOpenExpiredMembers,
             ),
             StatTile(
               label: 'حضور اليوم',
