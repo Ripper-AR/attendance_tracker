@@ -68,40 +68,48 @@ class _LiveAttendanceDisplayScreenState
               final records = widget.store.todayAttendanceRecords.reversed
                   .toList();
 
-              return Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: <Widget>[
-                    LiveAttendanceHeader(
-                      now: _now,
-                      totalCount: records.length,
-                      mode: _mode,
-                      isBeginnersDay: isBeginnersSchoolDay(_now),
-                      onModeChanged: (mode) => setState(() => _mode = mode),
-                      onClose: () => Navigator.of(context).maybePop(),
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 720;
+                  final padding = compact ? 8.0 : 14.0;
+
+                  return Padding(
+                    padding: EdgeInsets.all(padding),
+                    child: Column(
+                      children: <Widget>[
+                        LiveAttendanceHeader(
+                          now: _now,
+                          totalCount: records.length,
+                          mode: _mode,
+                          isBeginnersDay: isBeginnersSchoolDay(_now),
+                          onModeChanged: (mode) => setState(() => _mode = mode),
+                          onClose: () => Navigator.of(context).maybePop(),
+                        ),
+                        SizedBox(height: compact ? 8 : 12),
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 260),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            child:
+                                _mode ==
+                                    LiveAttendanceDisplayMode.beginnersSchool
+                                ? SplitBeginnersAttendanceBoard(
+                                    key: const ValueKey<String>('beginners'),
+                                    records: records,
+                                    store: widget.store,
+                                  )
+                                : GeneralAttendanceBoard(
+                                    key: const ValueKey<String>('general'),
+                                    records: records,
+                                    store: widget.store,
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 18),
-                    Expanded(
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 260),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        child:
-                            _mode == LiveAttendanceDisplayMode.beginnersSchool
-                            ? SplitBeginnersAttendanceBoard(
-                                key: const ValueKey<String>('beginners'),
-                                records: records,
-                                store: widget.store,
-                              )
-                            : GeneralAttendanceBoard(
-                                key: const ValueKey<String>('general'),
-                                records: records,
-                                store: widget.store,
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               );
             },
           ),
@@ -134,13 +142,31 @@ class LiveAttendanceHeader extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 1180;
+        final mini = constraints.maxWidth < 420;
+        final tiny = constraints.maxWidth < 520;
+
+        if (mini) {
+          return MiniLiveAttendanceHeader(
+            now: now,
+            totalCount: totalCount,
+            mode: mode,
+            isBeginnersDay: isBeginnersDay,
+            onModeChanged: onModeChanged,
+            onClose: onClose,
+          );
+        }
+
         final identity = Expanded(
-          child: HeaderIdentity(isBeginnersDay: isBeginnersDay),
+          child: HeaderIdentity(isBeginnersDay: isBeginnersDay, tiny: tiny),
         );
         final compactControls = <Widget>[
-          TotalCheckedInBadge(totalCount: totalCount),
-          LiveClockBadge(now: now),
-          DisplayModeSwitch(mode: mode, onModeChanged: onModeChanged),
+          TotalCheckedInBadge(totalCount: totalCount, tiny: tiny),
+          LiveClockBadge(now: now, tiny: tiny),
+          DisplayModeSwitch(
+            mode: mode,
+            compact: tiny,
+            onModeChanged: onModeChanged,
+          ),
         ];
         final controls = <Widget>[
           compactControls[0],
@@ -157,7 +183,10 @@ class LiveAttendanceHeader extends StatelessWidget {
         ];
 
         return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          padding: EdgeInsets.symmetric(
+            horizontal: tiny ? 10 : 14,
+            vertical: tiny ? 8 : 10,
+          ),
           decoration: BoxDecoration(
             color: const Color(0xFF10131F),
             borderRadius: BorderRadius.circular(8),
@@ -177,18 +206,21 @@ class LiveAttendanceHeader extends StatelessWidget {
                     Row(
                       children: <Widget>[
                         identity,
-                        const SizedBox(width: 12),
-                        IconButton.filledTonal(
-                          tooltip: 'رجوع',
-                          onPressed: onClose,
-                          icon: const Icon(Icons.close_fullscreen),
+                        SizedBox(width: tiny ? 6 : 10),
+                        SizedBox.square(
+                          dimension: tiny ? 36 : 44,
+                          child: IconButton.filledTonal(
+                            tooltip: 'رجوع',
+                            onPressed: onClose,
+                            icon: const Icon(Icons.close_fullscreen),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: tiny ? 8 : 10),
                     Wrap(
-                      spacing: 12,
-                      runSpacing: 10,
+                      spacing: tiny ? 7 : 10,
+                      runSpacing: tiny ? 7 : 8,
                       alignment: WrapAlignment.spaceBetween,
                       children: compactControls,
                     ),
@@ -201,10 +233,172 @@ class LiveAttendanceHeader extends StatelessWidget {
   }
 }
 
+class MiniLiveAttendanceHeader extends StatelessWidget {
+  const MiniLiveAttendanceHeader({
+    required this.now,
+    required this.totalCount,
+    required this.mode,
+    required this.isBeginnersDay,
+    required this.onModeChanged,
+    required this.onClose,
+    super.key,
+  });
+
+  final DateTime now;
+  final int totalCount;
+  final LiveAttendanceDisplayMode mode;
+  final bool isBeginnersDay;
+  final ValueChanged<LiveAttendanceDisplayMode> onModeChanged;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF10131F),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  _appBrandImageAsset,
+                  width: 28,
+                  height: 28,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      'مدرسة المبتدئين',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontSize: 13,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      isBeginnersDay ? 'لانش وراوندز' : 'الحضور العام',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontSize: 10,
+                        color: Colors.white.withValues(alpha: 0.68),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                constraints: const BoxConstraints(minWidth: 34),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF16A34A),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  totalCount.toString(),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontSize: 15,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              SizedBox.square(
+                dimension: 30,
+                child: PopupMenuButton<LiveAttendanceDisplayMode>(
+                  tooltip: 'تغيير العرض',
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    mode == LiveAttendanceDisplayMode.beginnersSchool
+                        ? Icons.dashboard_customize_outlined
+                        : Icons.groups_2_outlined,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                  onSelected: onModeChanged,
+                  itemBuilder: (context) =>
+                      const <PopupMenuEntry<LiveAttendanceDisplayMode>>[
+                        PopupMenuItem<LiveAttendanceDisplayMode>(
+                          value: LiveAttendanceDisplayMode.beginnersSchool,
+                          child: Text('مدرسة المبتدئين'),
+                        ),
+                        PopupMenuItem<LiveAttendanceDisplayMode>(
+                          value: LiveAttendanceDisplayMode.generalAttendance,
+                          child: Text('الحضور العام'),
+                        ),
+                      ],
+                ),
+              ),
+              SizedBox.square(
+                dimension: 30,
+                child: IconButton(
+                  tooltip: 'رجوع',
+                  padding: EdgeInsets.zero,
+                  onPressed: onClose,
+                  icon: const Icon(
+                    Icons.close_fullscreen,
+                    size: 17,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1F2937),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              intl.DateFormat('EEE d/MM - hh:mm:ss a', 'ar_EG').format(now),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              textDirection: TextDirection.rtl,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontSize: 11,
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class HeaderIdentity extends StatelessWidget {
-  const HeaderIdentity({required this.isBeginnersDay, super.key});
+  const HeaderIdentity({
+    required this.isBeginnersDay,
+    required this.tiny,
+    super.key,
+  });
 
   final bool isBeginnersDay;
+  final bool tiny;
 
   @override
   Widget build(BuildContext context) {
@@ -214,12 +408,12 @@ class HeaderIdentity extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           child: Image.asset(
             _appBrandImageAsset,
-            width: 58,
-            height: 58,
+            width: tiny ? 34 : 48,
+            height: tiny ? 34 : 48,
             fit: BoxFit.cover,
           ),
         ),
-        const SizedBox(width: 14),
+        SizedBox(width: tiny ? 8 : 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -229,12 +423,12 @@ class HeaderIdentity extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontSize: 30,
+                  fontSize: tiny ? 15 : 22,
                   fontWeight: FontWeight.w900,
                   color: Colors.white,
                 ),
               ),
-              const SizedBox(height: 5),
+              SizedBox(height: tiny ? 2 : 4),
               Text(
                 isBeginnersDay
                     ? 'اليوم: مدرسة المبتدئين'
@@ -242,6 +436,7 @@ class HeaderIdentity extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontSize: tiny ? 11 : 13,
                   color: Colors.white.withValues(alpha: 0.72),
                   fontWeight: FontWeight.w700,
                 ),
@@ -255,15 +450,23 @@ class HeaderIdentity extends StatelessWidget {
 }
 
 class TotalCheckedInBadge extends StatelessWidget {
-  const TotalCheckedInBadge({required this.totalCount, super.key});
+  const TotalCheckedInBadge({
+    required this.totalCount,
+    this.tiny = false,
+    super.key,
+  });
 
   final int totalCount;
+  final bool tiny;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 148),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      constraints: BoxConstraints(minWidth: tiny ? 74 : 118),
+      padding: EdgeInsets.symmetric(
+        horizontal: tiny ? 9 : 12,
+        vertical: tiny ? 6 : 8,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFF16A34A),
         borderRadius: BorderRadius.circular(8),
@@ -275,6 +478,7 @@ class TotalCheckedInBadge extends StatelessWidget {
           Text(
             'إجمالي الحضور',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              fontSize: tiny ? 10 : 12,
               color: Colors.white.withValues(alpha: 0.88),
               fontWeight: FontWeight.w800,
             ),
@@ -283,7 +487,7 @@ class TotalCheckedInBadge extends StatelessWidget {
             totalCount.toString(),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               color: Colors.white,
-              fontSize: 36,
+              fontSize: tiny ? 22 : 30,
               fontWeight: FontWeight.w900,
               height: 1,
             ),
@@ -295,15 +499,19 @@ class TotalCheckedInBadge extends StatelessWidget {
 }
 
 class LiveClockBadge extends StatelessWidget {
-  const LiveClockBadge({required this.now, super.key});
+  const LiveClockBadge({required this.now, this.tiny = false, super.key});
 
   final DateTime now;
+  final bool tiny;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 280),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      constraints: BoxConstraints(minWidth: tiny ? 140 : 228),
+      padding: EdgeInsets.symmetric(
+        horizontal: tiny ? 9 : 12,
+        vertical: tiny ? 6 : 8,
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFF1F2937),
         borderRadius: BorderRadius.circular(8),
@@ -318,6 +526,7 @@ class LiveClockBadge extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              fontSize: tiny ? 10 : 12,
               color: Colors.white.withValues(alpha: 0.78),
               fontWeight: FontWeight.w800,
             ),
@@ -327,7 +536,7 @@ class LiveClockBadge extends StatelessWidget {
             textDirection: TextDirection.ltr,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               color: Colors.white,
-              fontSize: 30,
+              fontSize: tiny ? 17 : 24,
               fontWeight: FontWeight.w900,
               height: 1.1,
             ),
@@ -341,11 +550,13 @@ class LiveClockBadge extends StatelessWidget {
 class DisplayModeSwitch extends StatelessWidget {
   const DisplayModeSwitch({
     required this.mode,
+    required this.compact,
     required this.onModeChanged,
     super.key,
   });
 
   final LiveAttendanceDisplayMode mode;
+  final bool compact;
   final ValueChanged<LiveAttendanceDisplayMode> onModeChanged;
 
   @override
@@ -371,16 +582,16 @@ class DisplayModeSwitch extends StatelessWidget {
         ),
       ),
       onSelectionChanged: (selection) => onModeChanged(selection.first),
-      segments: const <ButtonSegment<LiveAttendanceDisplayMode>>[
+      segments: <ButtonSegment<LiveAttendanceDisplayMode>>[
         ButtonSegment<LiveAttendanceDisplayMode>(
           value: LiveAttendanceDisplayMode.beginnersSchool,
-          icon: Icon(Icons.dashboard_customize_outlined),
-          label: Text('مدرسة المبتدئين'),
+          icon: const Icon(Icons.dashboard_customize_outlined),
+          label: Text(compact ? 'المدرسة' : 'مدرسة المبتدئين'),
         ),
         ButtonSegment<LiveAttendanceDisplayMode>(
           value: LiveAttendanceDisplayMode.generalAttendance,
-          icon: Icon(Icons.groups_2_outlined),
-          label: Text('الحضور العام'),
+          icon: const Icon(Icons.groups_2_outlined),
+          label: Text(compact ? 'العام' : 'الحضور العام'),
         ),
       ],
     );
@@ -408,7 +619,7 @@ class SplitBeginnersAttendanceBoard extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 900;
+        final compact = constraints.maxWidth < 700;
         final panels = <Widget>[
           Expanded(
             child: AttendanceTrackColumn(
@@ -420,7 +631,7 @@ class SplitBeginnersAttendanceBoard extends StatelessWidget {
               emptyText: 'لا يوجد حضور لانش حتى الآن',
             ),
           ),
-          const SizedBox(width: 18, height: 18),
+          const SizedBox(width: 10, height: 10),
           Expanded(
             child: AttendanceTrackColumn(
               title: 'راوندز (Rounds)',
@@ -472,7 +683,7 @@ class AttendanceTrackColumn extends StatelessWidget {
       child: Column(
         children: <Widget>[
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: accentColor.withValues(alpha: 0.16),
               borderRadius: const BorderRadius.vertical(
@@ -484,15 +695,15 @@ class AttendanceTrackColumn extends StatelessWidget {
             ),
             child: Row(
               children: <Widget>[
-                Icon(icon, color: accentColor, size: 34),
-                const SizedBox(width: 12),
+                Icon(icon, color: accentColor, size: 20),
+                const SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontSize: 34,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
                     ),
@@ -506,7 +717,7 @@ class AttendanceTrackColumn extends StatelessWidget {
             child: records.isEmpty
                 ? EmptyAttendancePanel(text: emptyText, color: accentColor)
                 : Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(6),
                     child: ListView.builder(
                       itemCount: records.length,
                       itemBuilder: (context, index) {
@@ -539,8 +750,8 @@ class CountBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minWidth: 118),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      constraints: const BoxConstraints(minWidth: 76),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(8),
@@ -549,6 +760,7 @@ class CountBadge extends StatelessWidget {
         'العدد: $count',
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          fontSize: 13,
           color: Colors.black,
           fontWeight: FontWeight.w900,
         ),
@@ -578,7 +790,7 @@ class GeneralAttendanceBoard extends StatelessWidget {
       child: Column(
         children: <Widget>[
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.08),
               borderRadius: const BorderRadius.vertical(
@@ -593,14 +805,14 @@ class GeneralAttendanceBoard extends StatelessWidget {
                 const Icon(
                   Icons.groups_2_outlined,
                   color: Color(0xFF93C5FD),
-                  size: 34,
+                  size: 20,
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     'الحضور العام اليوم',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontSize: 34,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
                     ),
@@ -627,13 +839,37 @@ class GeneralAttendanceBoard extends StatelessWidget {
                           ? 2
                           : 1;
 
+                      if (crossAxisCount == 1) {
+                        return ListView.builder(
+                          padding: const EdgeInsets.all(6),
+                          itemCount: records.length,
+                          itemBuilder: (context, index) {
+                            final record = records[index];
+                            final member = store.memberById(record.memberId);
+                            final accentColor =
+                                record.track == AttendanceTrack.rounds
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFF22C55E);
+
+                            return LiveAttendeeCard(
+                              key: ValueKey<String>(record.id),
+                              record: record,
+                              member: member,
+                              sequenceNumber: index + 1,
+                              accentColor: accentColor,
+                              showTrack: true,
+                            );
+                          },
+                        );
+                      }
+
                       return GridView.builder(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(6),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: crossAxisCount == 1 ? 5.7 : 4.8,
+                          mainAxisSpacing: 6,
+                          crossAxisSpacing: 6,
+                          childAspectRatio: crossAxisCount == 1 ? 3.5 : 3.8,
                         ),
                         itemCount: records.length,
                         itemBuilder: (context, index) {
@@ -699,24 +935,24 @@ class LiveAttendeeCard extends StatelessWidget {
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(15),
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.all(7),
         decoration: BoxDecoration(
           color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(8),
-          border: Border(right: BorderSide(color: accentColor, width: 6)),
+          border: Border(right: BorderSide(color: accentColor, width: 4)),
           boxShadow: <BoxShadow>[
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.24),
-              blurRadius: 18,
-              offset: const Offset(0, 10),
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           children: <Widget>[
             SequenceBadge(number: sequenceNumber, color: accentColor),
-            const SizedBox(width: 14),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -728,15 +964,15 @@ class LiveAttendeeCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: const Color(0xFF0B1220),
-                      fontSize: 28,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
-                      height: 1.08,
+                      height: 1.05,
                     ),
                   ),
-                  const SizedBox(height: 9),
+                  const SizedBox(height: 5),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 7,
+                    spacing: 4,
+                    runSpacing: 4,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: <Widget>[
                       DisplayCategoryTag(
@@ -781,8 +1017,8 @@ class SequenceBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 62,
-      height: 62,
+      width: 38,
+      height: 38,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: color,
@@ -794,6 +1030,7 @@ class SequenceBadge extends StatelessWidget {
           '#$number',
           textDirection: TextDirection.ltr,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontSize: 13,
             color: Colors.black,
             fontWeight: FontWeight.w900,
           ),
@@ -818,7 +1055,7 @@ class DisplayCategoryTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
@@ -827,13 +1064,14 @@ class DisplayCategoryTag extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 18, color: color),
-          const SizedBox(width: 5),
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 3),
           Text(
             text,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontSize: 10,
               color: color,
               fontWeight: FontWeight.w900,
             ),
@@ -858,7 +1096,7 @@ class EmptyAttendancePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(8),
@@ -867,13 +1105,18 @@ class EmptyAttendancePanel extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(Icons.hourglass_empty, color: color, size: 30),
-            const SizedBox(width: 12),
-            Text(
-              text,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
+            Icon(Icons.hourglass_empty, color: color, size: 18),
+            const SizedBox(width: 7),
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: 12,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
