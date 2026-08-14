@@ -7,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import 'attendance_store.dart';
+import 'live_attendance_display_screen.dart';
 import 'models.dart';
 
 const String appBrandImageAsset = 'assets/images/app_logo.jpeg';
@@ -225,6 +226,11 @@ class _HomeScreenState extends State<HomeScreen> {
             title: const Text('Attendance Tracker'),
             actions: <Widget>[
               IconButton(
+                tooltip: 'شاشة العرض',
+                onPressed: () => _openLiveDisplay(context),
+                icon: const Icon(Icons.tv),
+              ),
+              IconButton(
                 tooltip: 'Scan QR',
                 onPressed: () => _openScanner(context),
                 icon: const Icon(Icons.qr_code_scanner),
@@ -239,6 +245,8 @@ class _HomeScreenState extends State<HomeScreen> {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
             children: <Widget>[
+              SmartDisplayEntry(onTap: () => _openLiveDisplay(context)),
+              const SizedBox(height: 16),
               DashboardGrid(
                 store: widget.store,
                 onOpenAllMembers: () =>
@@ -335,6 +343,14 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => TodayAttendanceScreen(store: widget.store),
+      ),
+    );
+  }
+
+  void _openLiveDisplay(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LiveAttendanceDisplayScreen(store: widget.store),
       ),
     );
   }
@@ -750,6 +766,73 @@ class DashboardMemberDetailsCard extends StatelessWidget {
   }
 }
 
+class SmartDisplayEntry extends StatelessWidget {
+  const SmartDisplayEntry({required this.onTap, super.key});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isBeginnersDay = isBeginnersSchoolDay(cairoNow());
+    final color = isBeginnersDay
+        ? const Color(0xFF0F766E)
+        : const Color(0xFF2563EB);
+
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: <Widget>[
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.11),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.tv, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      isBeginnersDay
+                          ? 'مدرسة المبتدئين اليوم'
+                          : 'شاشة الحضور العامة',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      isBeginnersDay
+                          ? 'الوضع الافتراضي: لانش وراوندز'
+                          : 'الوضع الافتراضي: حضور اليوم',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.black.withValues(alpha: 0.62),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Icon(
+                Icons.chevron_left,
+                color: Colors.black.withValues(alpha: 0.42),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class DashboardGrid extends StatelessWidget {
   const DashboardGrid({
     required this.store,
@@ -1081,6 +1164,12 @@ class TodayAttendanceTile extends StatelessWidget {
                 runSpacing: 6,
                 children: <Widget>[
                   SubscriptionBadge(state: state),
+                  SmallInfoPill(
+                    text: attendanceTrackLabel(record.track),
+                    icon: record.track == AttendanceTrack.rounds
+                        ? Icons.sync_alt
+                        : Icons.rocket_launch_outlined,
+                  ),
                   SmallInfoPill(
                     text: member.subscriptionType,
                     icon: Icons.card_membership,
@@ -2312,6 +2401,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
   MobileScannerController? _scannerController;
   bool _isHandlingScan = false;
   ScanResult? _lastResult;
+  AttendanceTrack _selectedTrack = AttendanceTrack.launch;
 
   @override
   void initState() {
@@ -2362,11 +2452,22 @@ class _ScannerScreenState extends State<ScannerScreen> {
           left: 16,
           right: 16,
           bottom: 16,
-          child: ScanResultPanel(
-            result: _lastResult,
-            isWaiting: !_isHandlingScan,
-            onScanAgain: _scanAgain,
-            onRenewMember: _openRenewalForm,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              AttendanceTrackSelector(
+                selectedTrack: _selectedTrack,
+                enabled: !_isHandlingScan,
+                onChanged: (track) => setState(() => _selectedTrack = track),
+              ),
+              const SizedBox(height: 10),
+              ScanResultPanel(
+                result: _lastResult,
+                isWaiting: !_isHandlingScan,
+                onScanAgain: _scanAgain,
+                onRenewMember: _openRenewalForm,
+              ),
+            ],
           ),
         ),
       ],
@@ -2379,6 +2480,12 @@ class _ScannerScreenState extends State<ScannerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          AttendanceTrackSelector(
+            selectedTrack: _selectedTrack,
+            enabled: !_isHandlingScan,
+            onChanged: (track) => setState(() => _selectedTrack = track),
+          ),
+          const SizedBox(height: 12),
           TextField(
             controller: _manualQrController,
             decoration: const InputDecoration(
@@ -2425,7 +2532,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
     setState(() => _isHandlingScan = true);
     await _scannerController?.stop();
 
-    final result = await widget.store.registerScan(rawValue);
+    final result = await widget.store.registerScan(
+      rawValue,
+      track: _selectedTrack,
+    );
 
     if (!mounted) {
       return;
@@ -2554,6 +2664,59 @@ class ScanResultPanel extends StatelessWidget {
                 label: const Text('تجديد الاشتراك'),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AttendanceTrackSelector extends StatelessWidget {
+  const AttendanceTrackSelector({
+    required this.selectedTrack,
+    required this.enabled,
+    required this.onChanged,
+    super.key,
+  });
+
+  final AttendanceTrack selectedTrack;
+  final bool enabled;
+  final ValueChanged<AttendanceTrack> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(
+              'نوع النزول',
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<AttendanceTrack>(
+              selected: <AttendanceTrack>{selectedTrack},
+              showSelectedIcon: false,
+              onSelectionChanged: enabled
+                  ? (selection) => onChanged(selection.first)
+                  : null,
+              segments: <ButtonSegment<AttendanceTrack>>[
+                ButtonSegment<AttendanceTrack>(
+                  value: AttendanceTrack.launch,
+                  icon: const Icon(Icons.rocket_launch_outlined),
+                  label: Text(attendanceTrackLabel(AttendanceTrack.launch)),
+                ),
+                ButtonSegment<AttendanceTrack>(
+                  value: AttendanceTrack.rounds,
+                  icon: const Icon(Icons.sync_alt),
+                  label: Text(attendanceTrackLabel(AttendanceTrack.rounds)),
+                ),
+              ],
+            ),
           ],
         ),
       ),

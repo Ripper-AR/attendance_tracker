@@ -68,30 +68,36 @@ class AttendanceStore extends ChangeNotifier {
     return List<AttendanceRecord>.unmodifiable(records);
   }
 
+  List<AttendanceRecord> todayAttendanceRecordsFor(AttendanceTrack track) {
+    final records = todayAttendanceRecords
+        .where((record) => record.track == track)
+        .toList();
+    return List<AttendanceRecord>.unmodifiable(records);
+  }
+
   Future<void> load() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final membersJson = await _preferences.getString(_membersKey);
-      final attendanceJson = await _preferences.getString(_attendanceKey);
-
-      _members = _decodeList(membersJson)
-          .map((json) => Member.fromJson(json))
-          .where((member) => member.id.isNotEmpty && member.qrToken.isNotEmpty)
-          .toList();
-
-      _attendance = _decodeList(attendanceJson)
-          .map((json) => AttendanceRecord.fromJson(json))
-          .where((record) => record.id.isNotEmpty && record.memberId.isNotEmpty)
-          .toList();
+      await _loadPersistedData();
     } catch (error) {
       _errorMessage = 'تعذر تحميل البيانات المحلية';
       debugPrint('Local load failed: $error');
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> refreshFromStorage() async {
+    try {
+      await _loadPersistedData();
+      _errorMessage = null;
+      notifyListeners();
+    } catch (error) {
+      debugPrint('Local refresh failed: $error');
     }
   }
 
@@ -202,7 +208,10 @@ class AttendanceStore extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<ScanResult> registerScan(String rawQrValue) async {
+  Future<ScanResult> registerScan(
+    String rawQrValue, {
+    AttendanceTrack track = AttendanceTrack.launch,
+  }) async {
     final qrToken = rawQrValue.trim();
     if (qrToken.isEmpty) {
       return const ScanResult(type: ScanResultType.empty);
@@ -227,6 +236,7 @@ class AttendanceStore extends ChangeNotifier {
       id: _uuid.v4(),
       memberId: member.id,
       scannedAt: DateTime.now(),
+      track: track,
     );
 
     _attendance = <AttendanceRecord>[..._attendance, record];
@@ -238,6 +248,21 @@ class AttendanceStore extends ChangeNotifier {
       member: member,
       attendanceCount: attendanceCountFor(member.id),
     );
+  }
+
+  Future<void> _loadPersistedData() async {
+    final membersJson = await _preferences.getString(_membersKey);
+    final attendanceJson = await _preferences.getString(_attendanceKey);
+
+    _members = _decodeList(membersJson)
+        .map((json) => Member.fromJson(json))
+        .where((member) => member.id.isNotEmpty && member.qrToken.isNotEmpty)
+        .toList();
+
+    _attendance = _decodeList(attendanceJson)
+        .map((json) => AttendanceRecord.fromJson(json))
+        .where((record) => record.id.isNotEmpty && record.memberId.isNotEmpty)
+        .toList();
   }
 
   Future<void> _persist() async {

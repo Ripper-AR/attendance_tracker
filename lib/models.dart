@@ -9,6 +9,10 @@ String dateKey(DateTime value) {
   return '${date.year}-$month-$day';
 }
 
+DateTime cairoNow() {
+  return DateTime.now().toUtc().add(const Duration(hours: 3));
+}
+
 const String monthlySubscriptionType = 'شهري';
 const String quarterlySubscriptionType = 'ربع سنوي';
 const String yearlySubscriptionType = 'سنوي';
@@ -38,6 +42,10 @@ const List<String> sessionBasedSubscriptionTypes = <String>[
 
 const int nearExpiryDaysThreshold = 7;
 
+bool isBeginnersSchoolDay(DateTime value) {
+  return value.weekday == DateTime.monday || value.weekday == DateTime.thursday;
+}
+
 bool isSessionCountSubscription(String subscriptionType) {
   return sessionBasedSubscriptionTypes.contains(subscriptionType.trim());
 }
@@ -65,6 +73,30 @@ int _lastDayOfMonth(int year, int month) {
 }
 
 enum SubscriptionState { active, nearExpiry, expired }
+
+enum AttendanceTrack { launch, rounds }
+
+String attendanceTrackLabel(AttendanceTrack track) {
+  return switch (track) {
+    AttendanceTrack.launch => 'لانش',
+    AttendanceTrack.rounds => 'راوندز',
+  };
+}
+
+String attendanceTrackJsonValue(AttendanceTrack track) {
+  return switch (track) {
+    AttendanceTrack.launch => 'launch',
+    AttendanceTrack.rounds => 'rounds',
+  };
+}
+
+AttendanceTrack attendanceTrackFromJson(Object? value) {
+  return switch (value?.toString().trim().toLowerCase()) {
+    'rounds' || 'round' || 'راوندز' => AttendanceTrack.rounds,
+    'launch' || 'لانش' => AttendanceTrack.launch,
+    _ => AttendanceTrack.launch,
+  };
+}
 
 class Member {
   const Member({
@@ -217,11 +249,13 @@ class AttendanceRecord {
     required this.id,
     required this.memberId,
     required this.scannedAt,
+    this.track = AttendanceTrack.launch,
   });
 
   final String id;
   final String memberId;
   final DateTime scannedAt;
+  final AttendanceTrack track;
 
   String get dayKey => dateKey(scannedAt);
 
@@ -230,6 +264,7 @@ class AttendanceRecord {
       'id': id,
       'memberId': memberId,
       'scannedAt': scannedAt.toIso8601String(),
+      'track': attendanceTrackJsonValue(track),
     };
   }
 
@@ -238,6 +273,7 @@ class AttendanceRecord {
       id: json['id']?.toString() ?? '',
       memberId: json['memberId']?.toString() ?? '',
       scannedAt: _parseDate(json['scannedAt'], DateTime.now()),
+      track: attendanceTrackFromJson(json['track']),
     );
   }
 }
